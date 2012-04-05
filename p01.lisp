@@ -3,14 +3,14 @@
 ;    W notacji prefiksowej: + a b
 ; Otoczmy to drugie nawiasami: (+ a b) i mamy wyrażenie w CL. Można pisać (+ 1 2 3 4 5). Tak samo:
 ; (if warunek instrukcje-true instrukcje-false)
-; Jeśli chcemy w if dodać więcej instrukcji np do true to używamy zwrotu (progn ins1 ins2 ins3 ...),
-; które jest odpowiednikiem begin..end z pascala lub { } z C/C++.
+; Jeśli chcemy w if dodać więcej instrukcji np do true to zwykle używamy zwrotu (progn ...),
+; które jest odpowiednikiem begin ... end z pascala lub { ... } z C/C++.
 ; By zapisać listę piszemy '(1 2 3). Ten pojedynczy cudzysłów (którego nie zamykamy!) mówi, że to
 ; jest lista, którą mamy wziąć dosłownie. Porównaj:
 ;  * '(if 1 2 3)  ; to jest po prostu lista
-;  (IF 1 2 3)     ; ...mówiłem, że CL jest case-insensitive?
-;  * (if 1 2 3)   ; a to jest odpalenie if-a
-;  2              ; rezultat
+;  (IF 1 2 3)     ; ...mówiłem, że jeśli chodzi o takie rzeczy to CL jest case-insensitive?
+;  * (if 1 2 3)   ; A to jest odpalenie if-a. 1 nie jest nullem więc jest prawdą więc
+;  2              ; rezultatem jest 2
 ; Ten pojedynczy cudzysłów jest równoważny makru quote, tzn.: '(1 2 3) <=> (quote (1 2 3))
 ; Quote pozwala też pisać pojedyncze litery, np: 'a
 ; Oprócz tego listę można tworzyć używając funkcji (lub makra, nie pamiętam) list, np: (list 1 2 3)
@@ -119,21 +119,76 @@ Zwraca różnicę ciągu. "
 ;>>>> def isGeom(lst):
 ;>>>>     """ Sprawdza, czy podany ciąg jest geometryczny.
 ;>>>>     Zwraca iloraz ciągu. """
+(defun isGeom (lst)
+  "Sprawdza, czy podany ciąg jest geometryczny. Zwraca iloraz ciągu."
 ;>>>>     if len(lst) <= 2: return lst and lst[0] or False
+  (if (<= (length lst)
+	  2)
+      (first lst) ; w sumie to tamto pythonowe można zapisać po prostu tak ;)
 ;>>>>     zrs = [i for i,x in enumerate(lst) if x == 0]
+    (let* ((zrs (loop for i from 0 ; moje ukochane loop!
+		      and x in lst
+		      when (equal x 0)
+		      collect i)))
 ;>>>>     if zrs and not (zrs == range(len(lst)) or zrs == range(len(lst))[1:]):
 ;>>>>         return False
 ;>>>>     if zrs: return 0
+      (if zrs
+	(let ((rng (loop for i from 0 and x in lst collect i))) ; wiem, że to jest dłuższe, ALE
+	  (if (or (equal zrs rng)                               ; 1) zaraz sobie napiszę funkcję range
+		  (equal zrs (rest rng)))                       ; 2) w pythonie dwa razy wołaliśmy range,
+	      (return-from isGeom nil)                          ;    tutaj tylko jeden raz
+	    (return-from isGeom 0)))                            ; 3) w pythonie lista[1:] kopiuje CAŁĄ listę,
+	                                                        ;    tj. ma złożoność O(n). W CL ta operacja
+	                                                        ;    trwa O(1) bo czemu niby miałaby trwać
+	                                                        ;    dłużej? :P
+	                                                        ; 4) tym razem użyłem czegoś takiego jak
+	                                                        ;  return-from nazwaFunkcji wartość ;P
 ;>>>>     r = float(lst[1])/float(lst[0])
 ;>>>>     p = lst[0]/r
+	(let* ((r (/ (second lst)
+		     (first lst))) ; oczywiście da się robić let w let dowolną ilość razy.
+	       (p (/ (first lst)   ; Aa i jeszcze odpowiedź na pytanie: czemu let* a nie let? To drugie też
+		     r)))          ; istnieje, ale ma nieco inne działanie.
+			       ; Na przykład, niech A=3 B=4
+			       ; (let ((a 5) (b a)) ...) <-- to tworzy nowe zmienne, które oczywiście
+                               ;                             przesłaniają stare A i B, natomiast
+                               ;                             wartość B to będzie 3. Let korzysta ze
+                               ;                             starych wiązań (tych spoza let) przy ustalaniu
+                               ;                             wartości
+                               ; (let* ((a 5) (b a)) ... ) <-- tutaj B jest ustalane na 5 -- przy ustalaniu
+                               ;                               wartości let* korzysta także z tego, co sam
+                               ;                               zdefiniował
 ;>>>>     for x in lst:
 ;>>>>         if float(x)/float(p) != r: return False
 ;>>>>         r = float(x)/float(p)
 ;>>>>         p = x
 ;>>>>     return r
+	  (loop for x in lst do
+		(when (not (equal (/ x p) ; kolejna ciekawostka: (* (/ 1 3) 3) daje dokładnie 1.
+				  r))     ; jakim cudem? Bo CL posiada ułamki ;P 1/3 to dokładnie 1/3.
+		  (return nil))           ; Jakby trzeba było mieć float to (float (/ 1 3)) no ale po co?
+		(setf r (/ x p)
+		      p x)
+		return r)))))) ;; Może jest brzydziej niż w pythonie, ale jest szybciej asymptotycznie,
+                               ;; szybciej praktycznie (kompilacja do natywnej binarki) i dokładniej.
+                               ;; Jakby szybkość była kluczowa, to można jeszcze dopisać informacje
+                               ;; o typach (np. przyjmij, że lst jest listą floatów) -- wtedy kompilator
+                               ;; jeszcze mocniej zoptymalizuje binarkę.
+                               ;; Pod tym względem CL bije Pythona na głowę ;) Pod względem czytelności
+                               ;; nie no ale cóż... There is no such a thing like free sandwitch.
+
+
+
 ;>>>> def nextGeom(lst,r):
 ;>>>>     """ Zwraca następny element lst -- ciągu geometrycznego o ilorazie r. """
 ;>>>>     return lst[-1]*r
+(defun nextGeom (lst r)
+  "Zwraca następny element lst -- ciągu geometrycznego o ilorazie r"
+  (* r (first (last lst)))) ; taa, dość dziwne, że last zwraca listę...
+
+
+
 ;>>>> def isFib(lst):
 ;>>>>     """ Stwierdza, czy lst jest ciągiem Fibonacciego (musi zaczynać się
 ;>>>>     od [1,1,2,3,5,...]). Zwraca parę -- dwa ostatnie wyrazy ciągu. """
